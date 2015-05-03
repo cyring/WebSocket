@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+	<head>
+        <meta charset="utf-8">
+        <script type="text/javascript">
+        	function WebSocketClient()
+		{
+			try {
+				var ws=new WebSocket("ws://localhost:8080", "dumb-increment-protocol");
+			}
+			catch(err) {
+				document.getElementById("socketState").innerHTML="WebSockets [" + err + "]";
+			}
+			ws.onopen=function(evt)
+			{
+				document.getElementById("socketState").innerHTML="WebSockets [" + evt.type + "]";
+			}
+
+			ws.onclose=function(evt)
+			{
+				document.getElementById("socketState").innerHTML="WebSockets [" + evt.type + "]";
+			}
+			ws.onmessage=function(evt)
+			{
+				var obj=JSON.parse(evt.data);
+				document.getElementById("Processes").innerHTML=obj.Processes;
+				document.getElementById("TotalRAM").innerHTML=obj.Memory.Total;
+				document.getElementById("FreeRAM").innerHTML=obj.Memory.Free;
+				document.getElementById("SharedRAM").innerHTML=obj.Memory.Shared;
+				document.getElementById("BufferRAM").innerHTML=obj.Memory.Buffer;
+			}
+        	}
+        </script>
+        </head>
+	<body onload="WebSocketClient()">
+		<h1 id="socketState"></h1>
+		<div>
+			<p style="word-spacing: 1em;">Processes [<span id="Processes"></span>]</p>
+		</div>
+		<div>
+			<p style="word-spacing: 1em;">Memory. Total [<span id="TotalRAM"></span>] Free [<span id="FreeRAM"></span>] Shared [<span id="SharedRAM"></span>] Buffer [<span id="BufferRAM"></span>]</p>
+		</div>
+	</body>
+</html>
