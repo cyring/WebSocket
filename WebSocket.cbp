@@ -34,7 +34,6 @@
 		<Linker>
 			<Add library="websockets_shared" />
 		</Linker>
-		<Unit filename="WebClient.html" />
 		<Unit filename="WebSocket.c">
 			<Option compilerVar="CC" />
 		</Unit>

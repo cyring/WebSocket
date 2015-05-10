@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+	<head>
+        <meta charset="utf-8">
+	<link id="css-selector" rel="stylesheet" href="themes/red/style.css">
+        <script src="scripts/wsclient.js"></script>
+	<script src="scripts/theme-selector.js"></script>
+        </head>
+	<body onload="WebSocketClient()">
+		<h1 id="socketState"></h1>
+		<div>
+			<p style="word-spacing: 1em;">Processes [<span id="Processes"></span>]</p>
+		</div>
+		<div>
+			<p style="word-spacing: 1em;">Memory. Total [<span id="TotalRAM"></span>] Free [<span id="FreeRAM"></span>] Shared [<span id="SharedRAM"></span>] Buffer [<span id="BufferRAM"></span>]</p>
+		</div>
+		<button id="SuspendBtn" type="button" disabled onclick="BtnHandler()">Suspend</button>
+		<button id="ResumeBtn" type="button" disabled onclick="BtnHandler()">Resume</button>
+		<button onclick="themeSelector('themes/red/style.css')" style="float: right;">Red theme</button>
+		<button onclick="themeSelector('themes/blue/style.css')" style="float: right;">Blue theme</button>
+	</body>
+</html>

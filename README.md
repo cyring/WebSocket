@@ -6,12 +6,19 @@ Any client can suspend the server activity whom state is broadcasted to other cl
 A rudimentary JSON composes the bidirectional message protocol.
 ## Build
 The program is delivered with a [Code::Blocks](http://www.codeblocks.org) project file.
+```
+cc -lwebsockets_shared WebSocket.c -o bin/WebSocket
+```
 ## Run
- # Execute the server
+ 1- Execute the server
 ```
-./bin/Release/WebSocket
+./bin/WebSocket [port]
 ```
- # Open the client script file in a browser with shortcuts [CTRL]+[O]
+ 2- Open a browser and point to the server url with a given hostname:port
+```
+http://localhost:8080
+```
+ 3- You can also start the client script with the browser shortcut [CTRL]+[O]
 ```
 WebClient.html
 ```

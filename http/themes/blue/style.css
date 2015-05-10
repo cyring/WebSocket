@@ -1,0 +1,11 @@
+body {
+	background-color: black;
+	background-image: url('banner.png');
+	background-repeat: no-repeat;
+	background-position: 99% 5%;
+	color: white;
+}
+span {
+	background-color: transparent;
+	color: orange;
+}

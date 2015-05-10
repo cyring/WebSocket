@@ -1,27 +1,111 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/sysinfo.h>
 #include <libwebsockets.h>
 
+#define	QUOTES '"'
 #define	COUNT 20
 static int cTimer=COUNT;
 static int fSuspended=0;
 static struct sysinfo sysLinux;
 
-static int callback_http(struct libwebsocket_context *that,
+#define	ROOTDIR "http"
+typedef struct
+{
+	char *filePath;
+	struct stat fileStat;
+} SESSION_HTTP;
+
+const char *MIME_type(const char *filePath)
+{
+	struct
+	{
+		const char *extension;
+		const char *fullType;
+	} MIME_db[]=
+	{
+		{".html", "text/html"},
+		{".css",  "text/css"},
+		{".ico",  "image/x-icon"},
+		{".js",   "text/javascript"},
+		{".png",  "image/png"},
+		{NULL,    "text/plain"}
+	}, *walker=NULL;
+	for(walker=MIME_db; walker != NULL; walker++)
+		if(!strcmp(&filePath[strlen(filePath)-strlen(walker->extension)], walker->extension))
+			break;
+	return(walker->fullType);
+}
+
+static int callback_http(struct libwebsocket_context *ctx,
 			 struct libwebsocket *wsi,
 			 enum libwebsocket_callback_reasons reason,
 			 void *user, void *in, size_t len)
 {
-	return(0);
+	SESSION_HTTP *session=(SESSION_HTTP *) user;
+	char *pIn=(char *)in;
+
+	if(len > 0)
+		lwsl_notice("HTTP: reason[%d] , len[%zd] , in[%s] , user[%p]\n", reason, len, pIn, user);
+
+	int rc=0;
+	switch(reason)
+	{
+		case LWS_CALLBACK_HTTP:
+			if(len > 0)
+			{
+				session->filePath=calloc(2048, 1);
+				strcat(session->filePath, ROOTDIR);
+
+				if((len == 1) && (pIn[0] == '/'))
+					strcat(session->filePath, "/index.html");
+				else
+					strncat(session->filePath, pIn, len);
+
+				if(!stat(session->filePath, &session->fileStat)
+				&& (session->fileStat.st_size > 0)
+				&& (S_ISREG(session->fileStat.st_mode)))
+				{
+					if(libwebsockets_serve_http_file(ctx, wsi,
+									 session->filePath,
+									 MIME_type(session->filePath),
+									 NULL, 0) < 0)
+						rc=-1;
+				}
+				else
+				{
+					libwebsockets_return_http_status(ctx, wsi, HTTP_STATUS_NOT_FOUND, NULL);
+					rc=-1;
+				}
+				free(session->filePath);
+			}
+			else
+			{
+				libwebsockets_return_http_status(ctx, wsi, HTTP_STATUS_BAD_REQUEST, NULL);
+				if(lws_http_transaction_completed(wsi))
+					rc=-1;
+			}
+		break;
+		case LWS_CALLBACK_HTTP_BODY_COMPLETION:
+				libwebsockets_return_http_status(ctx, wsi, HTTP_STATUS_OK, NULL);
+		break;
+		case LWS_CALLBACK_HTTP_WRITEABLE:
+		break;
+		default:
+		break;
+	}
+	return(rc);
 }
 
-static int callback_simple_json(struct libwebsocket_context *that,
+static int callback_simple_json(struct libwebsocket_context *ctx,
 				struct libwebsocket *wsi,
 				enum libwebsocket_callback_reasons reason,
 				void *user, void *in, size_t len)
 {
+	if(len > 0)
+		lwsl_notice("JSON: reason[%d] , len[%zd] , in[%s] , user[%p]\n", reason, len, (char *)in, user);
 
 	switch(reason)
 	{
@@ -34,8 +118,8 @@ static int callback_simple_json(struct libwebsocket_context *that,
 				strncpy(jsonStr, in, len);
 				const char jsonCmp[2][12+1]=
 				{
-					{'"','R','e','s','u','m','e','B','t','n','"','\0'},
-					{'"','S','u','s','p','e','n','d','B','t','n','"','\0'}
+					{QUOTES,'R','e','s','u','m','e','B','t','n',QUOTES,'\0'},
+					{QUOTES,'S','u','s','p','e','n','d','B','t','n',QUOTES,'\0'}
 				};
 				int i=0;
 				for(i=0; i < 2; i++)
@@ -72,19 +156,19 @@ static int callback_simple_json(struct libwebsocket_context *that,
 								"}"\
 							"}"\
 						"}",
-						0x22,0x22,
+						QUOTES,QUOTES,
 						fSuspended,
-						0x22,0x22,
-							0x22,0x22,
+						QUOTES,QUOTES,
+							QUOTES,QUOTES,
 							sysLinux.procs,
-							0x22,0x22,
-								0x22,0x22,
+							QUOTES,QUOTES,
+								QUOTES,QUOTES,
 								sysLinux.totalram,
-								0x22,0x22,
+								QUOTES,QUOTES,
 								sysLinux.freeram,
-								0x22,0x22,
+								QUOTES,QUOTES,
 								sysLinux.sharedram,
-								0x22,0x22,
+								QUOTES,QUOTES,
 								sysLinux.bufferram);
 				size_t jsonLen=strlen(jsonStr);
 
@@ -103,7 +187,7 @@ static int callback_simple_json(struct libwebsocket_context *that,
 
 static struct libwebsocket_protocols protocols[]=
 {
-	{"http-only", callback_http, 0},
+	{"http-only", callback_http, sizeof(SESSION_HTTP)},
 	{"simple-json", callback_simple_json, 0},
 	{NULL, NULL, 0}
 };
