@@ -9,14 +9,14 @@
 	<body onload="WebSocketClient()">
 		<h1 id="socketState"></h1>
 		<div>
-			<p style="word-spacing: 1em;">Processes [<span id="Processes"></span>]</p>
+			<p class="SysInfo">Processes [<span id="Processes"></span>]</p>
 		</div>
 		<div>
-			<p style="word-spacing: 1em;">Memory. Total [<span id="TotalRAM"></span>] Free [<span id="FreeRAM"></span>] Shared [<span id="SharedRAM"></span>] Buffer [<span id="BufferRAM"></span>]</p>
+			<p class="SysInfo">Memory. Total [<span id="TotalRAM"></span>] Free [<span id="FreeRAM"></span>] Shared [<span id="SharedRAM"></span>] Buffer [<span id="BufferRAM"></span>]</p>
 		</div>
-		<button id="SuspendBtn" type="button" disabled onclick="BtnHandler()">Suspend</button>
-		<button id="ResumeBtn" type="button" disabled onclick="BtnHandler()">Resume</button>
-		<button onclick="themeSelector('themes/red/style.css')" style="float: right;">Red theme</button>
-		<button onclick="themeSelector('themes/blue/style.css')" style="float: right;">Blue theme</button>
+		<button class="ButtonHandler" id="SuspendBtn" type="button" disabled onclick="BtnHandler()">Suspend</button>
+		<button class="ButtonHandler" id="ResumeBtn" type="button" disabled onclick="BtnHandler()">Resume</button>
+		<button class="ThemeSelector" onclick="themeSelector('themes/red/style.css')">Red theme</button>
+		<button class="ThemeSelector" onclick="themeSelector('themes/blue/style.css')">Blue theme</button>
 	</body>
 </html>

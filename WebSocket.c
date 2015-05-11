@@ -33,7 +33,7 @@ const char *MIME_type(const char *filePath)
 		{".png",  "image/png"},
 		{NULL,    "text/plain"}
 	}, *walker=NULL;
-	for(walker=MIME_db; walker != NULL; walker++)
+	for(walker=MIME_db; walker->extension != NULL; walker++)
 		if(!strcmp(&filePath[strlen(filePath)-strlen(walker->extension)], walker->extension))
 			break;
 	return(walker->fullType);
@@ -73,6 +73,8 @@ static int callback_http(struct libwebsocket_context *ctx,
 									 MIME_type(session->filePath),
 									 NULL, 0) < 0)
 						rc=-1;
+					else
+						rc=0;
 				}
 				else
 				{
@@ -88,10 +90,21 @@ static int callback_http(struct libwebsocket_context *ctx,
 					rc=-1;
 			}
 		break;
+		case LWS_CALLBACK_HTTP_BODY:
+		{
+			lwsl_notice("HTTP: post data\n");
+		}
+		break;
 		case LWS_CALLBACK_HTTP_BODY_COMPLETION:
-				libwebsockets_return_http_status(ctx, wsi, HTTP_STATUS_OK, NULL);
+		{
+			lwsl_notice("HTTP: complete post data\n");
+			libwebsockets_return_http_status(ctx, wsi, HTTP_STATUS_OK, NULL);
+		}
 		break;
 		case LWS_CALLBACK_HTTP_WRITEABLE:
+		break;
+		case LWS_CALLBACK_CLOSED_HTTP:
+			lwsl_notice("HTTP closed connection\n");
 		break;
 		default:
 		break;
@@ -110,6 +123,7 @@ static int callback_simple_json(struct libwebsocket_context *ctx,
 	switch(reason)
 	{
 		case LWS_CALLBACK_ESTABLISHED:
+			lwsl_notice("JSON established connection\n");
 		break;
 		case LWS_CALLBACK_RECEIVE:
 			if(len > 0)
@@ -132,11 +146,7 @@ static int callback_simple_json(struct libwebsocket_context *ctx,
 			}
 		break;
 		case LWS_CALLBACK_USER:
-		break;
-		case LWS_CALLBACK_SERVER_WRITEABLE:
-		break;
-		default:
-			if(!len && (reason == LWS_CALLBACK_USER+1))
+			if(!len)
 			{
 				if(!fSuspended)
 					sysinfo(&sysLinux);
@@ -181,6 +191,13 @@ static int callback_simple_json(struct libwebsocket_context *ctx,
 				free(jsonStr);
 			}
 		break;
+		case LWS_CALLBACK_SERVER_WRITEABLE:
+		break;
+		case LWS_CALLBACK_CLOSED:
+			lwsl_notice("JSON closed connection\n");
+		break;
+		default:
+		break;
 	}
 	return(0);
 }
@@ -211,7 +228,7 @@ int main(int argc, char *argv[])
 			if(!cTimer)
 			{
 				cTimer=COUNT;
-				libwebsocket_callback_all_protocol(&protocols[1], LWS_CALLBACK_USER+1);
+				libwebsocket_callback_all_protocol(&protocols[1], LWS_CALLBACK_USER);
 			}
 		}
 		libwebsocket_context_destroy(context);

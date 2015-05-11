@@ -5,7 +5,16 @@ body {
 	background-position: 99% 5%;
 	color: white;
 }
-span {
+.SysInfo {
+        word-spacing: 1em;
+}
+.SysInfo span {
 	background-color: transparent;
 	color: orange;
+}
+.ButtonHandler {
+        float: left;
+}
+.ThemeSelector {
+        float: right;
 }
