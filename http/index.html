@@ -14,9 +14,12 @@
 		<div>
 			<p class="SysInfo">Memory. Total [<span id="TotalRAM"></span>] Free [<span id="FreeRAM"></span>] Shared [<span id="SharedRAM"></span>] Buffer [<span id="BufferRAM"></span>]</p>
 		</div>
-		<button class="ButtonHandler" id="SuspendBtn" type="button" disabled onclick="BtnHandler()">Suspend</button>
-		<button class="ButtonHandler" id="ResumeBtn" type="button" disabled onclick="BtnHandler()">Resume</button>
-		<button class="ThemeSelector" onclick="themeSelector('themes/red/style.css')">Red theme</button>
-		<button class="ThemeSelector" onclick="themeSelector('themes/blue/style.css')">Blue theme</button>
+		<div>
+			<button class="ButtonHandler" id="SuspendBtn" type="button" disabled onclick="BtnHandler()">Suspend</button>
+			<button class="ButtonHandler" id="ResumeBtn" type="button" disabled onclick="BtnHandler()">Resume</button>
+			<button class="ThemeSelector" onclick="themeSelector('themes/red/style.css')">Red theme</button>
+			<button class="ThemeSelector" onclick="themeSelector('themes/blue/style.css')">Blue theme</button>
+		</div>
+		<div id="logWindow"></div>
 	</body>
 </html>

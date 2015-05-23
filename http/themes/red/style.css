@@ -1,5 +1,5 @@
 body {
-	background-color: darkred;
+	background-color: #2a0308;
 	background-image: url('banner.png');
 	background-repeat: no-repeat;
 	background-position: 99% 5%;
@@ -17,4 +17,12 @@ body {
 }
 .ThemeSelector {
 	float: right;
+}
+#logWindow {
+	background-color: black;
+	border: #0c0c0c 2px solid;
+	font-size: smaller;
+	height: 600px;
+	overflow: auto;
+	width: auto;
 }

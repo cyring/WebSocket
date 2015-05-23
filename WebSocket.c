@@ -1,15 +1,147 @@
+/*
+ * WebSocket.c by CyrIng
+ *
+ * Licenses: GPL2
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <sys/stat.h>
 #include <sys/sysinfo.h>
 #include <libwebsockets.h>
+#include "sched.h"
 
+#define	MAXCPU 8
+
+typedef	enum {LOW_LEVEL=1, RISING_EDGE, HIGH_LEVEL, FALLING_EDGE} WAVEFORM;
+WAVEFORM Clock=LOW_LEVEL;
+
+#define	BT(F, N) (F & (1 << N))
+#define BS(F, N) (F |=(1 << N))
+#define BC(F) (F = 0)
 #define	QUOTES '"'
-#define	COUNT 20
+#define	TIMESTR "YYYY-MM-DD HH:MM:SS"
+#define	JSONSTR	"{"						\
+		"\"Time\":\"\","				\
+		"\"Suspended\":0,"				\
+		"\"SysInfo\":"					\
+			"{"					\
+			"\"Processes\":00000,"			\
+			"\"Memory\":"				\
+				"{"				\
+				"\"Total\":00000000000000,"	\
+				"\"Free\":00000000000000,"	\
+				"\"Shared\":00000000000000,"	\
+				"\"Buffer\":00000000000000"	\
+				"}"				\
+			"},"					\
+		"\"CPU\":[]"					\
+		"}"
+
+#define	COUNT 5
 static int cTimer=COUNT;
+static unsigned long int flags;
+
+void Transition(void)
+{
+	cTimer--;
+	if(!cTimer)
+	{
+		if(Clock == FALLING_EDGE)
+			{Clock=LOW_LEVEL;}
+		else
+			{Clock++;}
+		cTimer=COUNT;
+	}
+}
+
 static int fSuspended=0;
+static char *jsonString=NULL;
+static size_t jsonLength=0;
 static struct sysinfo sysLinux;
+static CPU_STRUCT *C=NULL;
+
+size_t jsonStringify(char *jsonStr)
+{
+	size_t fullLen=0;
+	time_t now=time(NULL);
+	char timeStr[sizeof(TIMESTR) + 1];
+
+	strftime(timeStr, sizeof(TIMESTR),
+		"%Y-%m-%d %H:%M:%S", localtime(&now));
+
+	if(!fSuspended)
+	{
+		char *jsonCPU=calloc(MAXCPU, (TASK_PIPE_DEPTH + 3) * (TASK_COMM_LEN + 3));
+		int cpu=0, i=0;
+		for(cpu=0; cpu < MAXCPU; cpu++)
+		{
+			strcat(jsonCPU, "[");
+			for(i=0; i < TASK_PIPE_DEPTH; i++)
+				sprintf(jsonCPU, "%s\"%s\"%c", jsonCPU, C[cpu].Task[i].comm,
+						(i < (TASK_PIPE_DEPTH - 1)) ? ',' : '\0');
+			if(cpu < (MAXCPU - 1))
+				strcat(jsonCPU, "],");
+			else
+				strcat(jsonCPU, "]");
+		}
+		fullLen=sprintf(jsonStr,
+				"{"					\
+				"\"Time\":\"%s\","			\
+				"\"Suspended\":%d,"			\
+				"\"SysInfo\":"				\
+					"{"				\
+					"\"Processes\":%hu,"		\
+					"\"Memory\":"			\
+						"{"			\
+						"\"Total\":%14lu,"	\
+						"\"Free\":%14lu,"	\
+						"\"Shared\":%14lu,"	\
+						"\"Buffer\":%14lu"	\
+						"}"			\
+					"},"				\
+				"\"CPU\":[%s]"				\
+				"}",
+				timeStr,
+				fSuspended,
+					sysLinux.procs,
+						sysLinux.totalram,
+						sysLinux.freeram,
+						sysLinux.sharedram,
+						sysLinux.bufferram,
+				jsonCPU);
+		free(jsonCPU);
+	}
+	else
+	{
+		fullLen=sprintf(jsonStr,
+				"{"					\
+				"\"Time\":\"%s\","			\
+				"\"Suspended\":%d,"			\
+				"\"SysInfo\":"				\
+					"{"				\
+					"\"Processes\":%hu,"		\
+					"\"Memory\":"			\
+						"{"			\
+						"\"Total\":%14lu,"	\
+						"\"Free\":%14lu,"	\
+						"\"Shared\":%14lu,"	\
+						"\"Buffer\":%14lu"	\
+						"}"			\
+					"}"				\
+				"}",
+				timeStr,
+				fSuspended,
+					sysLinux.procs,
+						sysLinux.totalram,
+						sysLinux.freeram,
+						sysLinux.sharedram,
+						sysLinux.bufferram);
+	}
+	return(fullLen);
+}
 
 #define	ROOTDIR "http"
 typedef struct
@@ -47,9 +179,6 @@ static int callback_http(struct libwebsocket_context *ctx,
 	SESSION_HTTP *session=(SESSION_HTTP *) user;
 	char *pIn=(char *)in;
 
-	if(len > 0)
-		lwsl_notice("HTTP: reason[%d] , len[%zd] , in[%s] , user[%p]\n", reason, len, pIn, user);
-
 	int rc=0;
 	switch(reason)
 	{
@@ -78,33 +207,30 @@ static int callback_http(struct libwebsocket_context *ctx,
 				}
 				else
 				{
-					libwebsockets_return_http_status(ctx, wsi, HTTP_STATUS_NOT_FOUND, NULL);
+					libwebsockets_return_http_status(ctx, wsi,
+									HTTP_STATUS_NOT_FOUND, NULL);
 					rc=-1;
 				}
 				free(session->filePath);
 			}
 			else
 			{
-				libwebsockets_return_http_status(ctx, wsi, HTTP_STATUS_BAD_REQUEST, NULL);
+				libwebsockets_return_http_status(ctx, wsi,
+								HTTP_STATUS_BAD_REQUEST, NULL);
 				if(lws_http_transaction_completed(wsi))
 					rc=-1;
 			}
 		break;
 		case LWS_CALLBACK_HTTP_BODY:
-		{
-			lwsl_notice("HTTP: post data\n");
-		}
 		break;
 		case LWS_CALLBACK_HTTP_BODY_COMPLETION:
 		{
-			lwsl_notice("HTTP: complete post data\n");
 			libwebsockets_return_http_status(ctx, wsi, HTTP_STATUS_OK, NULL);
 		}
 		break;
 		case LWS_CALLBACK_HTTP_WRITEABLE:
 		break;
 		case LWS_CALLBACK_CLOSED_HTTP:
-			lwsl_notice("HTTP closed connection\n");
 		break;
 		default:
 		break;
@@ -112,18 +238,35 @@ static int callback_http(struct libwebsocket_context *ctx,
 	return(rc);
 }
 
+
+typedef struct
+{
+	int sum;
+	int remainder;
+	unsigned char *buffer;
+} SESSION_JSON;
+
 static int callback_simple_json(struct libwebsocket_context *ctx,
 				struct libwebsocket *wsi,
 				enum libwebsocket_callback_reasons reason,
 				void *user, void *in, size_t len)
 {
-	if(len > 0)
-		lwsl_notice("JSON: reason[%d] , len[%zd] , in[%s] , user[%p]\n", reason, len, (char *)in, user);
+	SESSION_JSON *session=(SESSION_JSON *) user;
 
+	int rc=0;
 	switch(reason)
 	{
 		case LWS_CALLBACK_ESTABLISHED:
-			lwsl_notice("JSON established connection\n");
+		{
+			session->sum=0;
+			session->remainder=jsonLength;
+			session->buffer=malloc(	LWS_SEND_BUFFER_PRE_PADDING
+						+ jsonLength
+						+ LWS_SEND_BUFFER_POST_PADDING);
+			strncpy((char *) &session->buffer[LWS_SEND_BUFFER_PRE_PADDING],
+					jsonString,
+					jsonLength);
+		}
 		break;
 		case LWS_CALLBACK_RECEIVE:
 			if(len > 0)
@@ -145,95 +288,126 @@ static int callback_simple_json(struct libwebsocket_context *ctx,
 				free(jsonStr);
 			}
 		break;
-		case LWS_CALLBACK_USER:
-			if(!len)
+		case LWS_CALLBACK_SERVER_WRITEABLE:
 			{
-				if(!fSuspended)
-					sysinfo(&sysLinux);
-
-				char *jsonStr=malloc(256);
-				sprintf(jsonStr,"{"\
-						"%cSuspended%c:%d,"\
-						"%cSysInfo%c:"\
-							"{"\
-							"%cProcesses%c:%hu,"\
-							"%cMemory%c:"\
-								"{"\
-								"%cTotal%c:%14lu,"\
-								"%cFree%c:%14lu,"\
-								"%cShared%c:%14lu,"\
-								"%cBuffer%c:%14lu"\
-								"}"\
-							"}"\
-						"}",
-						QUOTES,QUOTES,
-						fSuspended,
-						QUOTES,QUOTES,
-							QUOTES,QUOTES,
-							sysLinux.procs,
-							QUOTES,QUOTES,
-								QUOTES,QUOTES,
-								sysLinux.totalram,
-								QUOTES,QUOTES,
-								sysLinux.freeram,
-								QUOTES,QUOTES,
-								sysLinux.sharedram,
-								QUOTES,QUOTES,
-								sysLinux.bufferram);
-				size_t jsonLen=strlen(jsonStr);
-
-				unsigned char *buffer=(unsigned char*) malloc(	LWS_SEND_BUFFER_PRE_PADDING
-										+ jsonLen
-										+ LWS_SEND_BUFFER_POST_PADDING);
-				strncpy((char *) &buffer[LWS_SEND_BUFFER_PRE_PADDING], jsonStr, jsonLen);
-				libwebsocket_write(wsi, &buffer[LWS_SEND_BUFFER_PRE_PADDING], jsonLen, LWS_WRITE_TEXT);
-				free(buffer);
-				free(jsonStr);
+				int written;
+				if(session->remainder > 0)
+				{
+					written=libwebsocket_write(wsi,
+						&session->buffer[session->sum + LWS_SEND_BUFFER_PRE_PADDING],
+									session->remainder, LWS_WRITE_TEXT);
+					if(written < 0) {
+						rc=1;
+						break;
+					}
+					else {
+						session->sum+=written;
+						session->remainder-=written;
+						if(session->remainder)
+							libwebsocket_callback_on_writable(ctx, wsi);
+					}
+				}
+				else {
+					session->sum=0;
+					session->remainder=jsonLength;
+					session->buffer=realloc(session->buffer,
+								LWS_SEND_BUFFER_PRE_PADDING
+								+ jsonLength
+								+ LWS_SEND_BUFFER_POST_PADDING);
+					strncpy((char *) &session->buffer[LWS_SEND_BUFFER_PRE_PADDING],
+							jsonString,
+							jsonLength);
+				}
 			}
 		break;
-		case LWS_CALLBACK_SERVER_WRITEABLE:
-		break;
 		case LWS_CALLBACK_CLOSED:
-			lwsl_notice("JSON closed connection\n");
+		{
+			free(session->buffer);
+		}
 		break;
 		default:
 		break;
 	}
-	return(0);
+	return(rc);
 }
 
 static struct libwebsocket_protocols protocols[]=
 {
 	{"http-only", callback_http, sizeof(SESSION_HTTP)},
-	{"simple-json", callback_simple_json, 0},
+	{"simple-json", callback_simple_json, sizeof(SESSION_JSON)},
 	{NULL, NULL, 0}
 };
 
 int main(int argc, char *argv[])
 {
+	int rc=0;
+	jsonLength=sizeof(TIMESTR);
+	jsonLength+=sizeof(JSONSTR);
+	jsonLength+=MAXCPU * (TASK_PIPE_DEPTH + 3) * (TASK_COMM_LEN + 3);
+	jsonString=malloc(jsonLength);
+
 	memset(&sysLinux, 0, sizeof(struct sysinfo));
-	struct libwebsocket_context *context;
-	struct lws_context_creation_info info;
-	memset(&info, 0, sizeof(info));
-	info.port=(argc == 2) ? atoi(argv[1]) : 8080;
-	info.gid=-1;
-	info.uid=-1;
-	info.protocols=protocols;
-	if((context=libwebsocket_create_context(&info)) != NULL)
+	C=malloc(MAXCPU * sizeof(CPU_STRUCT));
+
+	struct libwebsocket_context *Ctx;
+	struct lws_context_creation_info CtxInfo;
+	memset(&CtxInfo, 0, sizeof(CtxInfo));
+	CtxInfo.port=(argc == 2) ? atoi(argv[1]) : 8080;
+	CtxInfo.gid=-1;
+	CtxInfo.uid=-1;
+	CtxInfo.protocols=protocols;
+	if((Ctx=libwebsocket_create_context(&CtxInfo)) != NULL)
 	{
+		BC(flags);
 		while(1)	// SIGTERM
 		{
-			libwebsocket_service(context, 50);
-			cTimer--;
-			if(!cTimer)
+			libwebsocket_service(Ctx, 50);
+
+			Transition();
+			switch(Clock)
 			{
-				cTimer=COUNT;
-				libwebsocket_callback_all_protocol(&protocols[1], LWS_CALLBACK_USER);
+			case LOW_LEVEL:
+				if(!BT(flags, Clock)) {
+					if(!fSuspended) {
+						sysinfo(&sysLinux);
+
+						uSchedule(MAXCPU,
+							FALSE,
+							(argc == 3) ? atoi(argv[2])
+								: SORT_FIELD_RUNTIME,
+							C);
+					}
+					BS(flags, Clock);
+				}
+			break;
+			case RISING_EDGE:
+				if(!BT(flags, Clock)) {
+					jsonLength=jsonStringify(jsonString);
+					BS(flags, Clock);
+				}
+			break;
+			case HIGH_LEVEL:
+				if(!BT(flags, Clock)) {
+					libwebsocket_callback_on_writable_all_protocol(&protocols[1]);
+					BS(flags, Clock);
+				}
+			break;
+			case FALLING_EDGE:
+				if(flags) {
+					BC(flags);
+				}
+			break;
 			}
+			fflush(stdout);
 		}
-		libwebsocket_context_destroy(context);
-		return(0);
+		libwebsocket_context_destroy(Ctx);
+		rc=0;
 	}
 	else
-		return(-1);
+		rc=-1;
+
+	free(C);
+	if(jsonString)
+		free(jsonString);
+	return(rc);
 }

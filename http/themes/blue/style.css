@@ -18,3 +18,11 @@ body {
 .ThemeSelector {
         float: right;
 }
+#logWindow {
+	background-color: black;
+	border: #0c0c0c 2px solid;
+	font-size: smaller;
+	height: 600px;
+	overflow: auto;
+	width: auto;
+}

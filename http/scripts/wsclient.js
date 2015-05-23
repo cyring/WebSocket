@@ -34,6 +34,9 @@ function WebSocketClient()
 			document.getElementById("SuspendBtn").disabled=true;
 			document.getElementById("ResumeBtn").disabled=false;
 		}
+
+		tag="<pre>" + JSON.stringify(obj, null, 2) + "</pre>";
+		document.getElementById("logWindow").innerHTML=tag;
 	}
 }
 

@@ -22,7 +22,9 @@ http://localhost:8080
 ```
 WebClient.html
 ```
-# Regards
+# Screenshot
+* ![alt text](http://blog.cyring.free.fr/images/WebSocket.png "Linux Scheduler monitoring")
+## Regards
 _`CyrIng`_
 
  Paris ;-)

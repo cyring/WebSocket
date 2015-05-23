@@ -37,6 +37,15 @@
 		<Unit filename="WebSocket.c">
 			<Option compilerVar="CC" />
 		</Unit>
+		<Unit filename="http/index.html" />
+		<Unit filename="http/scripts/theme-selector.js" />
+		<Unit filename="http/scripts/wsclient.js" />
+		<Unit filename="http/themes/blue/style.css" />
+		<Unit filename="http/themes/red/style.css" />
+		<Unit filename="sched.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="sched.h" />
 		<Extensions>
 			<envvars />
 			<code_completion />
