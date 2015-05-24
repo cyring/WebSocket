@@ -2,11 +2,11 @@ body {
 	background-color: black;
 	background-image: url('banner.png');
 	background-repeat: no-repeat;
-	background-position: 99% 5%;
+	background-position: 98% 2%;
 	color: white;
 }
 .SysInfo {
-        word-spacing: 1em;
+        word-spacing: 0.25em;
 }
 .SysInfo span {
 	background-color: transparent;
@@ -22,7 +22,7 @@ body {
 	background-color: black;
 	border: #0c0c0c 2px solid;
 	font-size: smaller;
-	height: 600px;
+	height: 560px;
 	overflow: auto;
 	width: auto;
 }

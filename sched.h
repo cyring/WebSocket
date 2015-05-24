@@ -1,5 +1,5 @@
 /*
- * xfreq-api.h by CyrIng
+ * Part of xfreq-api.h by CyrIng
  *
  * XFreq
  * Copyright (C) 2013-2015 CYRIL INGENIERIE
@@ -72,4 +72,14 @@ typedef	enum
 
 #define	TASK_STRUCT_FORMAT	TASK_STATE_FMT""TASK_COMM_FMT" "TASK_PID_FMT" "TASK_TIME_FMT" "TASK_CTXSWITCH_FMT" "TASK_PRIORITY_FMT" "TASK_TIME_FMT" "TASK_TIME_FMT" "TASK_TIME_FMT" "TASK_NODE_FMT" "TASK_GROUP_FMT
 
-Bool32 uSchedule(unsigned int CPU, Bool32 Reverse, short int SortField, CPU_STRUCT *C) ;
+#define	PROCESSOR_FMT
+
+typedef struct {
+	unsigned int CPU;
+	char Model[64];
+	CPU_STRUCT *C;
+} PROC_STRUCT;
+
+PROC_STRUCT *uSchedInit(void) ;
+void uSchedFree(PROC_STRUCT *P) ;
+Bool32 uSchedule(Bool32 Reverse, short int SortField, PROC_STRUCT *P) ;

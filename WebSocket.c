@@ -10,10 +10,12 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <sys/sysinfo.h>
+#include <sys/utsname.h>
 #include <libwebsockets.h>
 #include "sched.h"
 
-#define	MAXCPU 8
+#define	MAXCPU 1
+static PROC_STRUCT *P=NULL;
 
 typedef	enum {LOW_LEVEL=1, RISING_EDGE, HIGH_LEVEL, FALLING_EDGE} WAVEFORM;
 WAVEFORM Clock=LOW_LEVEL;
@@ -22,22 +24,32 @@ WAVEFORM Clock=LOW_LEVEL;
 #define BS(F, N) (F |=(1 << N))
 #define BC(F) (F = 0)
 #define	QUOTES '"'
-#define	TIMESTR "YYYY-MM-DD HH:MM:SS"
-#define	JSONSTR	"{"						\
-		"\"Time\":\"\","				\
-		"\"Suspended\":0,"				\
-		"\"SysInfo\":"					\
-			"{"					\
-			"\"Processes\":00000,"			\
-			"\"Memory\":"				\
-				"{"				\
-				"\"Total\":00000000000000,"	\
-				"\"Free\":00000000000000,"	\
-				"\"Shared\":00000000000000,"	\
-				"\"Buffer\":00000000000000"	\
-				"}"				\
-			"},"					\
-		"\"CPU\":[]"					\
+#define	TIMESTR "YYYY-MM-DDTHH:MM:SS.000Z"
+#define	JSONSTR	"{"								\
+		"\"Transmission\":"						\
+			"{"							\
+			"\"Time\":\"YYYY-MM-DDTHH:MM:SS.000Z\","		\
+			"\"Starting\":false,"					\
+			"\"Suspended\":false"					\
+			"},"							\
+		"\"SysInfo\":"							\
+			"{"							\
+			"\"Kernel\":\"Operating System 0.0.0.0\","		\
+			"\"Processes\":00000,"					\
+			"\"Memory\":"						\
+				"{"						\
+				"\"Total\":00000000000000,"			\
+				"\"Free\":00000000000000,"			\
+				"\"Shared\":00000000000000,"			\
+				"\"Buffer\":00000000000000"			\
+				"}"						\
+			"},"							\
+		"\"ProcInfo\":"							\
+			"{"							\
+				"\"Core\":000,"					\
+				"\"Model\":\"Processor Model Name 0000MHz\""	\
+			"}"							\
+		"\"CPU\":[]"							\
 		"}"
 
 #define	COUNT 5
@@ -61,7 +73,44 @@ static int fSuspended=0;
 static char *jsonString=NULL;
 static size_t jsonLength=0;
 static struct sysinfo sysLinux;
-static CPU_STRUCT *C=NULL;
+
+size_t jsonStartify(char *jsonStr)
+{
+	size_t fullLen=0;
+	time_t now=time(NULL);
+	char timeStr[sizeof(TIMESTR) + 1];
+
+	strftime(timeStr, sizeof(TIMESTR),
+		"%Y-%m-%dT%H:%M:%S.000Z", localtime(&now));
+
+	struct utsname OSinfo={{0}};
+	uname(&OSinfo);
+
+	fullLen=sprintf(jsonStr,
+				"{"					\
+				"\"Transmission\":"			\
+					"{"				\
+					"\"Time\":\"%s\","		\
+					"\"Starting\":true,"		\
+					"\"Suspended\":%s"		\
+					"},"				\
+				"\"SysInfo\":"				\
+					"{"				\
+					"\"Kernel\":\"%s %s\""		\
+					"},"				\
+				"\"ProcInfo\":"				\
+					"{"				\
+					"\"Core\":%hu,"			\
+					"\"Model\":\"%s\""		\
+					"}"				\
+				"}",
+					timeStr,
+					(fSuspended) ? "true" : "false",
+					OSinfo.sysname, OSinfo.release,
+					P->CPU,
+					P->Model);
+	return(fullLen);
+}
 
 size_t jsonStringify(char *jsonStr)
 {
@@ -70,27 +119,31 @@ size_t jsonStringify(char *jsonStr)
 	char timeStr[sizeof(TIMESTR) + 1];
 
 	strftime(timeStr, sizeof(TIMESTR),
-		"%Y-%m-%d %H:%M:%S", localtime(&now));
+		"%Y-%m-%dT%H:%M:%S.000Z", localtime(&now));
 
 	if(!fSuspended)
 	{
-		char *jsonCPU=calloc(MAXCPU, (TASK_PIPE_DEPTH + 3) * (TASK_COMM_LEN + 3));
+		char *jsonCPU=calloc(P->CPU, (TASK_PIPE_DEPTH + 3) * (TASK_COMM_LEN + 3));
 		int cpu=0, i=0;
-		for(cpu=0; cpu < MAXCPU; cpu++)
+		for(cpu=0; cpu < P->CPU; cpu++)
 		{
 			strcat(jsonCPU, "[");
 			for(i=0; i < TASK_PIPE_DEPTH; i++)
-				sprintf(jsonCPU, "%s\"%s\"%c", jsonCPU, C[cpu].Task[i].comm,
+				sprintf(jsonCPU, "%s\"%s\"%c", jsonCPU, P->C[cpu].Task[i].comm,
 						(i < (TASK_PIPE_DEPTH - 1)) ? ',' : '\0');
-			if(cpu < (MAXCPU - 1))
+			if(cpu < (P->CPU - 1))
 				strcat(jsonCPU, "],");
 			else
 				strcat(jsonCPU, "]");
 		}
 		fullLen=sprintf(jsonStr,
 				"{"					\
-				"\"Time\":\"%s\","			\
-				"\"Suspended\":%d,"			\
+				"\"Transmission\":"			\
+					"{"				\
+					"\"Time\":\"%s\","		\
+					"\"Starting\":false,"		\
+					"\"Suspended\":%s"		\
+					"},"				\
 				"\"SysInfo\":"				\
 					"{"				\
 					"\"Processes\":%hu,"		\
@@ -104,41 +157,29 @@ size_t jsonStringify(char *jsonStr)
 					"},"				\
 				"\"CPU\":[%s]"				\
 				"}",
-				timeStr,
-				fSuspended,
+					timeStr,
+					(fSuspended) ? "true" : "false",
 					sysLinux.procs,
 						sysLinux.totalram,
 						sysLinux.freeram,
 						sysLinux.sharedram,
 						sysLinux.bufferram,
-				jsonCPU);
+					jsonCPU);
 		free(jsonCPU);
 	}
 	else
 	{
 		fullLen=sprintf(jsonStr,
 				"{"					\
-				"\"Time\":\"%s\","			\
-				"\"Suspended\":%d,"			\
-				"\"SysInfo\":"				\
+				"\"Transmission\":"			\
 					"{"				\
-					"\"Processes\":%hu,"		\
-					"\"Memory\":"			\
-						"{"			\
-						"\"Total\":%14lu,"	\
-						"\"Free\":%14lu,"	\
-						"\"Shared\":%14lu,"	\
-						"\"Buffer\":%14lu"	\
-						"}"			\
+					"\"Time\":\"%s\","		\
+					"\"Starting\":false,"		\
+					"\"Suspended\":%s"		\
 					"}"				\
 				"}",
-				timeStr,
-				fSuspended,
-					sysLinux.procs,
-						sysLinux.totalram,
-						sysLinux.freeram,
-						sysLinux.sharedram,
-						sysLinux.bufferram);
+					timeStr,
+					(fSuspended) ? "true" : "false");
 	}
 	return(fullLen);
 }
@@ -258,14 +299,17 @@ static int callback_simple_json(struct libwebsocket_context *ctx,
 	{
 		case LWS_CALLBACK_ESTABLISHED:
 		{
+			char *jsonStartStr=malloc(sizeof(JSONSTR));
+			int jsonStartLen=jsonStartify(jsonStartStr);
 			session->sum=0;
-			session->remainder=jsonLength;
+			session->remainder=jsonStartLen;
 			session->buffer=malloc(	LWS_SEND_BUFFER_PRE_PADDING
-						+ jsonLength
+						+ jsonStartLen
 						+ LWS_SEND_BUFFER_POST_PADDING);
 			strncpy((char *) &session->buffer[LWS_SEND_BUFFER_PRE_PADDING],
-					jsonString,
-					jsonLength);
+					jsonStartStr,
+					jsonStartLen);
+			free(jsonStartStr);
 		}
 		break;
 		case LWS_CALLBACK_RECEIVE:
@@ -341,13 +385,15 @@ static struct libwebsocket_protocols protocols[]=
 int main(int argc, char *argv[])
 {
 	int rc=0;
+
+	P=uSchedInit();
+
 	jsonLength=sizeof(TIMESTR);
 	jsonLength+=sizeof(JSONSTR);
-	jsonLength+=MAXCPU * (TASK_PIPE_DEPTH + 3) * (TASK_COMM_LEN + 3);
+	jsonLength+=P->CPU * (TASK_PIPE_DEPTH + 3) * (TASK_COMM_LEN + 3);
 	jsonString=malloc(jsonLength);
 
 	memset(&sysLinux, 0, sizeof(struct sysinfo));
-	C=malloc(MAXCPU * sizeof(CPU_STRUCT));
 
 	struct libwebsocket_context *Ctx;
 	struct lws_context_creation_info CtxInfo;
@@ -371,11 +417,10 @@ int main(int argc, char *argv[])
 					if(!fSuspended) {
 						sysinfo(&sysLinux);
 
-						uSchedule(MAXCPU,
-							FALSE,
+						uSchedule(FALSE,
 							(argc == 3) ? atoi(argv[2])
 								: SORT_FIELD_RUNTIME,
-							C);
+							P);
 					}
 					BS(flags, Clock);
 				}
@@ -406,8 +451,9 @@ int main(int argc, char *argv[])
 	else
 		rc=-1;
 
-	free(C);
 	if(jsonString)
 		free(jsonString);
+
+	uSchedFree(P);
 	return(rc);
 }
