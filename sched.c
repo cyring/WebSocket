@@ -43,12 +43,12 @@ int ParseCPUinfo(PARSER_STRUCT *parser)
 
 PROC_STRUCT *uSchedInit(void)
 {
-	PROC_STRUCT *P=malloc(sizeof(PROC_STRUCT));
+	PROC_STRUCT *P=calloc(1, sizeof(PROC_STRUCT));
 
 	PARSER_STRUCT Parser[]=
 	{
-		{"processor\t:%d",	&P->CPU},
-		{"model name\t:%48c",	P->Model},
+		{CPUINFO_PROC_FMT,	&P->CPU},
+		{CPUINFO_MODEL_FMT,	P->Model},
 		{NULL,	NULL}
 	};
 	ParseCPUinfo(Parser);

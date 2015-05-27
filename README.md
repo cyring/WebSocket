@@ -7,7 +7,7 @@ A rudimentary JSON composes the bidirectional message protocol.
 ## Build
 The program is delivered with a [Code::Blocks](http://www.codeblocks.org) project file.
 ```
-cc -lwebsockets_shared WebSocket.c -o bin/WebSocket
+cc -lwebsockets_shared sched.c WebSocket.c -o bin/WebSocket
 ```
 ## Run
  1- Execute the server

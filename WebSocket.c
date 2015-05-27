@@ -7,12 +7,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <time.h>
 #include <sys/stat.h>
 #include <sys/sysinfo.h>
 #include <sys/utsname.h>
 #include <libwebsockets.h>
 #include "sched.h"
+
+static int Shutdown=0;
 
 #define	MAXCPU 1
 static PROC_STRUCT *P=NULL;
@@ -48,7 +51,7 @@ WAVEFORM Clock=LOW_LEVEL;
 			"{"							\
 				"\"Core\":000,"					\
 				"\"Model\":\"Processor Model Name 0000MHz\""	\
-			"}"							\
+			"},"							\
 		"\"CPU\":[]"							\
 		"}"
 
@@ -76,7 +79,6 @@ static struct sysinfo sysLinux;
 
 size_t jsonStartify(char *jsonStr)
 {
-	size_t fullLen=0;
 	time_t now=time(NULL);
 	char timeStr[sizeof(TIMESTR) + 1];
 
@@ -86,7 +88,7 @@ size_t jsonStartify(char *jsonStr)
 	struct utsname OSinfo={{0}};
 	uname(&OSinfo);
 
-	fullLen=sprintf(jsonStr,
+	sprintf(jsonStr,
 				"{"					\
 				"\"Transmission\":"			\
 					"{"				\
@@ -109,12 +111,12 @@ size_t jsonStartify(char *jsonStr)
 					OSinfo.sysname, OSinfo.release,
 					P->CPU,
 					P->Model);
+	size_t fullLen=strlen(jsonStr);
 	return(fullLen);
 }
 
 size_t jsonStringify(char *jsonStr)
 {
-	size_t fullLen=0;
 	time_t now=time(NULL);
 	char timeStr[sizeof(TIMESTR) + 1];
 
@@ -136,7 +138,7 @@ size_t jsonStringify(char *jsonStr)
 			else
 				strcat(jsonCPU, "]");
 		}
-		fullLen=sprintf(jsonStr,
+		sprintf(jsonStr,
 				"{"					\
 				"\"Transmission\":"			\
 					"{"				\
@@ -169,7 +171,7 @@ size_t jsonStringify(char *jsonStr)
 	}
 	else
 	{
-		fullLen=sprintf(jsonStr,
+		sprintf(jsonStr,
 				"{"					\
 				"\"Transmission\":"			\
 					"{"				\
@@ -181,6 +183,7 @@ size_t jsonStringify(char *jsonStr)
 					timeStr,
 					(fSuspended) ? "true" : "false");
 	}
+	size_t fullLen=strlen(jsonStr);
 	return(fullLen);
 }
 
@@ -282,7 +285,7 @@ static int callback_http(struct libwebsocket_context *ctx,
 
 typedef struct
 {
-	int sum;
+	int prefixSum;
 	int remainder;
 	unsigned char *buffer;
 } SESSION_JSON;
@@ -300,8 +303,8 @@ static int callback_simple_json(struct libwebsocket_context *ctx,
 		case LWS_CALLBACK_ESTABLISHED:
 		{
 			char *jsonStartStr=malloc(sizeof(JSONSTR));
-			int jsonStartLen=jsonStartify(jsonStartStr);
-			session->sum=0;
+			size_t jsonStartLen=jsonStartify(jsonStartStr);
+			session->prefixSum=0;
 			session->remainder=jsonStartLen;
 			session->buffer=malloc(	LWS_SEND_BUFFER_PRE_PADDING
 						+ jsonStartLen
@@ -333,26 +336,27 @@ static int callback_simple_json(struct libwebsocket_context *ctx,
 			}
 		break;
 		case LWS_CALLBACK_SERVER_WRITEABLE:
+			if(!Shutdown)
 			{
 				int written;
 				if(session->remainder > 0)
 				{
 					written=libwebsocket_write(wsi,
-						&session->buffer[session->sum + LWS_SEND_BUFFER_PRE_PADDING],
+						&session->buffer[session->prefixSum + LWS_SEND_BUFFER_PRE_PADDING],
 									session->remainder, LWS_WRITE_TEXT);
 					if(written < 0) {
 						rc=1;
 						break;
 					}
 					else {
-						session->sum+=written;
+						session->prefixSum+=written;
 						session->remainder-=written;
 						if(session->remainder)
 							libwebsocket_callback_on_writable(ctx, wsi);
 					}
 				}
 				else {
-					session->sum=0;
+					session->prefixSum=0;
 					session->remainder=jsonLength;
 					session->buffer=realloc(session->buffer,
 								LWS_SEND_BUFFER_PRE_PADDING
@@ -361,6 +365,26 @@ static int callback_simple_json(struct libwebsocket_context *ctx,
 					strncpy((char *) &session->buffer[LWS_SEND_BUFFER_PRE_PADDING],
 							jsonString,
 							jsonLength);
+				}
+			}
+			else	// Flush the remaining buffer.
+			{
+				int written;
+				if(session->remainder > 0)
+				{
+					written=libwebsocket_write(wsi,
+						&session->buffer[session->prefixSum + LWS_SEND_BUFFER_PRE_PADDING],
+									session->remainder, LWS_WRITE_TEXT);
+					if(written < 0) {
+						rc=1;
+						break;
+					}
+					else {
+						session->prefixSum+=written;
+						session->remainder-=written;
+						if(session->remainder)
+							libwebsocket_callback_on_writable(ctx, wsi);
+					}
 				}
 			}
 		break;
@@ -382,9 +406,17 @@ static struct libwebsocket_protocols protocols[]=
 	{NULL, NULL, 0}
 };
 
+void sigHandler(int sig)
+{
+	Shutdown=1;
+	libwebsocket_callback_on_writable_all_protocol(&protocols[1]);
+}
+
 int main(int argc, char *argv[])
 {
 	int rc=0;
+
+	signal(SIGINT, sigHandler);
 
 	P=uSchedInit();
 
@@ -395,7 +427,7 @@ int main(int argc, char *argv[])
 
 	memset(&sysLinux, 0, sizeof(struct sysinfo));
 
-	struct libwebsocket_context *Ctx;
+	struct libwebsocket_context *Ctx=NULL;
 	struct lws_context_creation_info CtxInfo;
 	memset(&CtxInfo, 0, sizeof(CtxInfo));
 	CtxInfo.port=(argc == 2) ? atoi(argv[1]) : 8080;
@@ -405,7 +437,7 @@ int main(int argc, char *argv[])
 	if((Ctx=libwebsocket_create_context(&CtxInfo)) != NULL)
 	{
 		BC(flags);
-		while(1)	// SIGTERM
+		while(!Shutdown)
 		{
 			libwebsocket_service(Ctx, 50);
 
@@ -443,8 +475,11 @@ int main(int argc, char *argv[])
 				}
 			break;
 			}
-			fflush(stdout);
 		}
+		int countDown=30;
+		do {
+			libwebsocket_service(Ctx, 50);
+		} while(--countDown);
 		libwebsocket_context_destroy(Ctx);
 		rc=0;
 	}
@@ -455,5 +490,6 @@ int main(int argc, char *argv[])
 		free(jsonString);
 
 	uSchedFree(P);
+
 	return(rc);
 }

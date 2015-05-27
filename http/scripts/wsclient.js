@@ -2,7 +2,7 @@ var ws;
 function WebSocketClient()
 {
 	try {
-		ws=new WebSocket("ws://" + location.hostname + ":8080", "simple-json");
+		ws=new WebSocket("ws://" + location.hostname + ":" + location.port, "simple-json");
 	}
 	catch(err) {
 		document.getElementById("socketState").innerHTML="WebSockets [" + err + "]";
@@ -25,7 +25,14 @@ function WebSocketClient()
 	}
 	ws.onmessage=function(evt)
 	{
-		var obj=JSON.parse(evt.data);
+		var obj;
+		try {
+			obj=JSON.parse(evt.data);
+		}
+		catch(err) {
+			document.getElementById("logWindow").innerHTML=
+			err.message + document.getElementById("logWindow").innerHTML;
+		}
 		if(!obj.Transmission.Suspended) {
 			document.getElementById("SuspendBtn").disabled=false;
 			document.getElementById("ResumeBtn").disabled=true;
@@ -35,7 +42,7 @@ function WebSocketClient()
 		}
 		if(obj.Transmission.Starting) {
 			document.getElementById("Core").innerHTML=obj.ProcInfo.Core;
-			document.getElementById("Model").innerHTML=obj.ProcInfo.Model;
+			document.getElementById("Model").innerHTML=obj.ProcInfo.Model.trim();
 			document.getElementById("Kernel").innerHTML=obj.SysInfo.Kernel;
 		} else {
 			if(!obj.Transmission.Suspended) {
@@ -46,8 +53,17 @@ function WebSocketClient()
 				document.getElementById("BufferRAM").innerHTML=obj.SysInfo.Memory.Buffer;
 			}
 		}
-		tag="<pre>" + JSON.stringify(obj, null, 2) + "</pre>";
-		document.getElementById("logWindow").innerHTML=tag;
+		var str;
+		try {
+			str=JSON.stringify(obj, null, 2);
+		}
+		catch(err) {
+			str=err.message;
+		}
+		finally {
+			tag="<pre>" + str + "</pre>";
+			document.getElementById("logWindow").innerHTML=tag;
+		}
 	}
 }
 

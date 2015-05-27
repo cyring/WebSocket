@@ -72,7 +72,8 @@ typedef	enum
 
 #define	TASK_STRUCT_FORMAT	TASK_STATE_FMT""TASK_COMM_FMT" "TASK_PID_FMT" "TASK_TIME_FMT" "TASK_CTXSWITCH_FMT" "TASK_PRIORITY_FMT" "TASK_TIME_FMT" "TASK_TIME_FMT" "TASK_TIME_FMT" "TASK_NODE_FMT" "TASK_GROUP_FMT
 
-#define	PROCESSOR_FMT
+#define	CPUINFO_PROC_FMT	"processor\t:%d"
+#define	CPUINFO_MODEL_FMT	"model name\t:%48c"
 
 typedef struct {
 	unsigned int CPU;
