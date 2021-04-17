@@ -1,22 +1,20 @@
 <!DOCTYPE html>
 <html>
 	<head>
-        <meta charset="utf-8">
+	<meta charset="utf-8">
 	<link id="css-selector" rel="stylesheet" href="themes/red/style.css">
-        <script src="scripts/wsclient.js"></script>
+	<script src="scripts/wsclient.js"></script>
 	<script src="scripts/theme-selector.js"></script>
-        </head>
+	</head>
 	<body onload="WebSocketClient()">
 		<h1 id="socketState"></h1>
-		<div>
-			<p class="SysInfo">Core [<span id="Core">0</span>] Model [<span id="Model">#</span>]</p>
-		</div>
 		<div>
 			<p class="SysInfo">Kernel [<span id="Kernel">#</span>] Processes [<span id="Processes">0</span>]</p>
 		</div>
 		<div>
 			<p class="SysInfo">Memory. Total [<span id="TotalRAM">0</span>] Free [<span id="FreeRAM">0</span>] Shared [<span id="SharedRAM">0</span>] Buffer [<span id="BufferRAM">0</span>]</p>
 		</div>
+		<div id="logWindow"></div>
 		<div>
 			<button class="ButtonHandler" id="SuspendBtn" type="button" disabled onclick="BtnHandler();">Suspend</button>
 			<button class="ButtonHandler" id="ResumeBtn" type="button" disabled onclick="BtnHandler();">Resume</button>
@@ -25,6 +23,5 @@
 			<button class="ThemeSelector" onclick="themeSelector('themes/red/style.css')">Red theme</button>
 			<button class="ThemeSelector" onclick="themeSelector('themes/blue/style.css')">Blue theme</button>
 		</div>
-		<div id="logWindow"></div>
 	</body>
 </html>

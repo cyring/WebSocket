@@ -41,8 +41,6 @@ function WebSocketClient()
 			document.getElementById("ResumeBtn").disabled=false;
 		}
 		if(obj.Transmission.Starting) {
-			document.getElementById("Core").innerHTML=obj.ProcInfo.Core;
-			document.getElementById("Model").innerHTML=obj.ProcInfo.Model.trim();
 			document.getElementById("Kernel").innerHTML=obj.SysInfo.Kernel;
 		} else {
 			if(!obj.Transmission.Suspended) {

@@ -1,25 +1,25 @@
 body {
-	background-color: black;
+	background-color: #04141f;
 	background-image: url('banner.png');
 	background-repeat: no-repeat;
-	background-position: 98% 2%;
+	background-position: top right;
 	color: white;
 }
 .SysInfo {
-        word-spacing: 0.25em;
+	word-spacing: 0.25em;
 }
 .SysInfo span {
 	background-color: transparent;
 	color: orange;
 }
 .ButtonHandler {
-        float: left;
+	float: left;
 }
 .ThemeSelector {
-        float: right;
+	float: right;
 }
 #logWindow {
-	background-color: black;
+	background-color: #092d48;
 	border: #0c0c0c 2px solid;
 	font-size: smaller;
 	height: 560px;
