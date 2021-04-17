@@ -5,9 +5,9 @@ Every second, the server pushes the Linux system information toward the Javascri
 Any client can suspend the server activity whom state is broadcasted to other clients.
 A rudimentary JSON composes the bidirectional message protocol.
 ## Build
-The program is delivered with a [Code::Blocks](http://www.codeblocks.org) project file.
+Just enter `make` or rebuild as below
 ```
-cc -lwebsockets_shared sched.c WebSocket.c -o bin/WebSocket
+make clean all
 ```
 ## Run
  1- Execute the server
@@ -22,9 +22,8 @@ http://localhost:8080
 ```
 WebClient.html
 ```
-# Screenshot
-* ![alt text](http://blog.cyring.free.fr/images/WebSocket.png "Linux Scheduler monitoring")
-## Regards
+
+## Enjoy
 _`CyrIng`_
 
  Paris ;-)
